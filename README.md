@@ -1,8 +1,8 @@
 # mqtt2any
 
-This program implements a generic [MQTT] subscription handler. It accepts a
-number of routes that will pass data acquired from topics corresponding to
-specific subscriptionsto sandboxed [Tcl](https://www.tcl.tk/)
+This program implements a generic [MQTT](http://mqtt.org/) subscription handler.
+It accepts a number of routes that will pass data acquired from topics
+corresponding to specific subscriptionsto sandboxed [Tcl](https://www.tcl.tk/)
 [interpreters](https://www.tcl.tk/man/tcl8.6/TclCmd/safe.htm) for treatment. The
 sandboxing is able to restrict which part of the disk hierarchy is accessible to
 the interpreters, and which hosts these interpreters are allowed to communicate
