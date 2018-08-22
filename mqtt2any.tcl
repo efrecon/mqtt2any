@@ -32,6 +32,7 @@ set prg_args {
     -keepalive  60                 "Keep-alive frequency, in secs."
     -name       "%hostname%-%pid%-%prgname%"  "MQTT client name"
     -clean      on                 "MQTT clean connection?"
+    -retry      "1000:120000"      "Retry connection?"
 }
 
 
@@ -79,6 +80,8 @@ if { [toclbox getopt opts -help] } {
 # the way into the main program's status array.
 array set MQ2A {
     plugins {}
+    mqtt    ""
+    retry   -1
 }
 foreach { arg val dsc } $prg_args {
     set MQ2A($arg) $val
@@ -262,6 +265,7 @@ proc Liveness { topic dta } {
                     foreach { subscription route options } $MQ2A(-routes) {
                         $MQ2A(mqtt) subscribe $subscription [list ::Receiver $subscription]
                     }
+                    set MQ2A(retry) -1;   # Reinitialise retry backoff
                 }
                 "disconnected" {
                     array set reasons {
@@ -276,6 +280,40 @@ proc Liveness { topic dta } {
                         toclbox debug WARN "Disconnected from broker $reasons([dict get $dta reason])"
                     } else {
                         toclbox debug WARN "Disconnected from broker code: [dict get $dta reason]"
+                    }
+
+                    # Try to connect again to the server in a little while, this
+                    # will arrange to force the creation of a whole new MQTT
+                    # context and connection. The current implementation is able
+                    # of exponential backoff to minimise the strain on the broker
+                    if { [string first ":" $MQ2A(-retry)] >= 0 } {
+                        # Use the colon sign to express the minimum time to wait
+                        # for reconnection, the maximum and the factor by which
+                        # to multiply each time (defaults to twice)
+                        lassign [split $MQ2A(-retry) ":"] min max factor
+                        if { $factor eq "" } { set factor 2 }
+                        if { $MQ2A(retry) < 0 } {
+                            set MQ2A(retry) $min
+                        } elseif { $MQ2A(retry) > $max } {
+                            set MQ2A(retry) $max
+                        } else {
+                            set MQ2A(retry) [expr {int($MQ2A(retry)*$factor)}]
+                        }
+                    } else {
+                        # Otherwise -retry should just be an integer. Covers for
+                        # most mistakes (non-integer, empty string) through
+                        # turning the feature off.
+                        set MQ2A(retry) $MQ2A(-retry)
+                        if { $MQ2A(retry) eq "" \
+                                    || ![string is integer -strict $MQ2A(retry)] } {
+                            toclbox debug WARN "$MQ2A(-retry) should be an integer or integers separated by colon signs!"
+                            set MQ2A(retry) -1
+                        }
+                    }
+
+                    if { $MQ2A(retry) > 0 } {
+                        toclbox debug NOTICE "Trying to connect again in $MQ2A(retry) ms."
+                        after $MQ2A(retry) [list ::Connect 1]
                     }
                 }
             }
@@ -298,6 +336,57 @@ proc Liveness { topic dta } {
     }
 }
 
+proc Connect { { force 0 } } {
+    global MQ2A
+
+    if { $force } {
+        if { $MQ2A(mqtt) ne "" } {
+            $MQ2A(mqtt) disconnect
+            set MQ2A(mqtt) ""
+        }
+    }
+
+    if { $MQ2A(mqtt) eq "" } {
+        # Split URL and decide how to connect to broker, allowing for TLS support if
+        # necessary.
+        set broker [::toclbox::url::split $MQ2A(-broker)]
+        if { [dict get $broker "scheme"] eq "mqtts" } {
+            set cmd [list ::toclbox::network::tls_socket]
+        } else {
+            set cmd [list socket]
+        }
+
+        # Create MQTT context
+        set MQ2A(mqtt) [mqtt new \
+                            -username [dict get $broker "user"] \
+                            -password [dict get $broker "pwd"] \
+                            -socketcmd $cmd \
+                            -keepalive $MQ2A(-keepalive) \
+                            -clean $MQ2A(-clean)]
+
+        # Generate client name
+        set cname [::toclbox::text::resolve $MQ2A(-name) \
+                        [list hostname [info hostname] \
+                            pid [pid]]]
+        set cname [string range $cname 0 22];  # Cut to MQTT max length
+
+        # Connection Liveness. We will start subscribing to topics once we've connected
+        # successfully to the broker.
+        $MQ2A(mqtt) subscribe \$LOCAL/connection ::Liveness
+        $MQ2A(mqtt) subscribe \$LOCAL/subscription ::Liveness
+
+        # Connect to remote broker
+        if { [dict get $broker "port"] eq "" } {
+            $MQ2A(mqtt) connect $cname [dict get $broker "host"]
+        } else {
+            $MQ2A(mqtt) connect $cname [dict get $broker "host"] [dict get $broker "port"]
+        }
+    }
+
+    return $MQ2A(mqtt)
+}
+
+
 # Verify broker specification, automatically add mqtt:// in front if necessary.
 if { ![string match "mqtt://*" $MQ2A(-broker)] && ![string match "mqtts://*" $MQ2A(-broker)] } {
     if { [string first "://" $MQ2A(-broker)] < 0 } {
@@ -309,40 +398,8 @@ if { ![string match "mqtt://*" $MQ2A(-broker)] && ![string match "mqtts://*" $MQ
     }
 }
 
-# Split URL and decide how to connect to broker, allowing for TLS support if
-# necessary.
-set broker [::toclbox::url::split $MQ2A(-broker)]
-if { [dict get $broker "scheme"] eq "mqtts" } {
-    set cmd [list ::toclbox::network::tls_socket]
-} else {
-    set cmd [list socket]
-}
-
-# Create MQTT context
-set MQ2A(mqtt) [mqtt new \
-                    -username [dict get $broker "user"] \
-                    -password [dict get $broker "pwd"] \
-                    -socketcmd $cmd \
-                    -keepalive $MQ2A(-keepalive) \
-                    -clean $MQ2A(-clean)]
-
-# Generate client name
-set cname [::toclbox::text::resolve $MQ2A(-name) \
-                [list hostname [info hostname] \
-                      pid [pid]]]
-set cname [string range $cname 0 22];  # Cut to MQTT max length
-
-# Connection Liveness. We will start subscribing to topics once we've connected
-# successfully to the broker.
-$MQ2A(mqtt) subscribe \$LOCAL/connection ::Liveness
-$MQ2A(mqtt) subscribe \$LOCAL/subscription ::Liveness
-
-# Connect to remote broker
-if { [dict get $broker "port"] eq "" } {
-    $MQ2A(mqtt) connect $cname [dict get $broker "host"]
-} else {
-    $MQ2A(mqtt) connect $cname [dict get $broker "host"] [dict get $broker "port"]
-}
+# Establish connection
+Connect
 
 # Read list of recognised plugins out from the routes.  Plugins are only to be
 # found in the directory specified as part of the -exts option.  Each file will
