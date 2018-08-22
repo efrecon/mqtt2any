@@ -178,9 +178,16 @@ proc ::plugin:init { } {
                 # with us: disque to operate on jobs and debug to output some
                 # debugging information.
                 if { $strong } {
-                    set slave [::toclbox::interp::create $plugin -environment $envptn {*}$options]
+                    set slave [::toclbox::interp::create $plugin \
+                                    -environment $envptn \
+                                    -alias [list debug ::debug $fname] \
+                                    {*}$options]
                 } else {
-                    set slave [::toclbox::interp::create $plugin -safe -environment $envptn {*}$options]
+                    set slave [::toclbox::interp::create $plugin \
+                                    -safe \
+                                    -environment $envptn \
+                                    -alias [list debug ::debug $fname] \
+                                    {*}$options]
                 }
                 if { $slave ne "" } {
                     $slave alias debug ::debug $fname
