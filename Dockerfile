@@ -3,6 +3,7 @@ MAINTAINER Emmanuel Frecon <efrecon@gmail.com>
 
 COPY *.tcl /opt/mqtt2any/
 COPY lib/mqtt/ /opt/mqtt2any/lib/mqtt/
+COPY lib/smqtt/ /opt/mqtt2any/lib/smqtt/
 COPY lib/toclbox/ /opt/mqtt2any/lib/toclbox/
 
 # Export the plugin directory so it gets easy to test new plugins.
