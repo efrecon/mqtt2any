@@ -167,7 +167,7 @@ data posted at topics of the main MQTT server used by `mqtt2any` to other MQTT
 brokers. Forwarding is perhaps best explained starting with an example that is
 broken up in logical pieces and explained below.
 
-    ./mqtt2any.tcl -verbose "*.tcl debug * info" -broker mqtt://test.mosquitto.org -routes "bbc/# forward\!%topic%@mqtt.tcl \"-alias {smqtt smqtt} -environment MQTT_BROKER=mqtt://broker.hivemq.com\""
+    ./mqtt2any.tcl -verbose "*.tcl debug * info" -broker mqtt://test.mosquitto.org -routes "bbc/# forward@mqtt.tcl \"-alias {smqtt smqtt} -environment MQTT_BROKER=mqtt://broker.hivemq.com\""
 
 The example leverages the BBC subtitles sent to the mosquitto test
 [broker](https://test.mosquitto.org) and forwards their content as-is to the
