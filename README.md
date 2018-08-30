@@ -2,12 +2,14 @@
 
 This program implements a generic [MQTT](http://mqtt.org/) subscription handler.
 It accepts a number of routes that will pass data acquired from topics
-corresponding to specific subscriptionsto sandboxed [Tcl](https://www.tcl.tk/)
+corresponding to specific subscriptions to sandboxed [Tcl](https://www.tcl.tk/)
 [interpreters](https://www.tcl.tk/man/tcl8.6/TclCmd/safe.htm) for treatment. The
 sandboxing is able to restrict which part of the disk hierarchy is accessible to
 the interpreters, and which hosts these interpreters are allowed to communicate
-with. This manual describes command-line options and the interaction between the
-topic subscriptions and procedures.
+with. In addition, a MQTT forwarding implementation based on the same core
+facilitates the active replication of topics hierarchies between MQTT servers.
+This manual describes command-line options and the interaction between the topic
+subscriptions and procedures.
 
 ## Command-Line Options
 
@@ -142,7 +144,7 @@ and the additional security that safe interpreters provide.
 
 ## Example
 
-Runnint the following command leverages the `$SYS` tree made available at the
+Running the following command leverages the `$SYS` tree made available at the
 [mosquitto](http://test.mosquitto.org/) project. This uses the example data
 dumping procedure described above.
 
@@ -157,3 +159,66 @@ provide your own scripts, easiest is to make them available under the
 `/var/mqtt2any/exts` directory of containers based on this image.
 
   [efrecon/medium-tcl]: https://hub.docker.com/r/efrecon/medium-tcl/
+
+## Forwarding
+
+The default [plugins](exts/) directory contains code to facilitate forwarding of
+data posted at topics of the main MQTT server used by `mqtt2any` to other MQTT
+brokers. Forwarding is perhaps best explained starting with an example that is
+broken up in logical pieces and explained below.
+
+    ./mqtt2any.tcl -verbose "*.tcl debug * info" -broker mqtt://test.mosquitto.org -routes "bbc/# forward\!%topic%@mqtt.tcl \"-alias {smqtt smqtt} -environment MQTT_BROKER=mqtt://broker.hivemq.com\""
+
+The example leverages the BBC subtitles sent to the mosquitto test
+[broker](https://test.mosquitto.org) and forwards their content as-is to the
+same topics at the HiveMQ public [broker](https://www.hivemq.com/try-out/)
+available at the address `broker.hivemq.com`. The options to the example command
+are as follows:
+
+* `-verbose` sets the verbosity for all Tcl implementations to `DEBUG` while
+  keeping the remaining levels to `INFO`. This is to ensure being able to print
+  out debug information from the implementation at `mqtt.tcl` in the `exts/`
+  directory.
+* `-broker` simply points at the test mosquitto broker.
+* `-routes` is a single triplet to be understood as follows:
+  1. The first item `bbc/#` is a MQTT subscription that matches all the BBC
+     subtitles at the mosquitto test server.
+  2. The second item `forward@mqtt.tcl` requests `mqtt2any` to send data
+     received on those topics to the procedure called `forward` in the file
+     `mqtt.tcl` (located in the default plugins directory at `exts/`).
+  3. The last item, enclosed in quotes escaped with backslashes for the shell,
+     is a set of dash-led options and arguments as explained above. These
+     options are the following:
+     - `-alias` installs an alias in the slave interpreter for the `smqtt`,
+       alias takes a source and destionation commands. This will allow the
+       interpreter to use the same MQTT implementation as the one used for
+       `mqtt2any` and to execute this code back *in the main* interpreter.
+     - `-environment` declares and sets the variable `MQTT_BROKER` in order to
+       pass information about the remote broker where to forward content. This
+       variable is to be understood as `MQTT` matching (in uppercase) the name
+       of the plugin implementation file, and `BROKER` matching (in uppercase)
+       the `-broker` option declared at the top of the `mqtt.tcl` forwarding
+       implementation.
+
+Testing this example should be as easy as running it and pointing your browser
+to the HiveMQ websocket [page](http://www.hivemq.com/demos/websocket-client/).
+There you should be able to connect to the HiveMQ demo broker and subscribe to
+`bbc/#`. You should see the content of the BBC subtitles that are being
+forwarding by your process to the HiveMQ broker.
+
+### Arguments
+
+The `forward` procedure can currently take 3 arguments, these can be specified
+by inserting them surrounded by `!` marks in the route specification.
+
+* The first argument is the topic to which to publish data that was received by
+  the main MQTT broker. By default, when no argument is specified (and as in the
+  example above) the same topic as the source will be used for the destination.
+  However, the implementation is able to use a number of `%` surrounded
+  sugar-strings that will be automatically be replaced by their values taken
+  from the source topic. `%topic%` will be replaced by the entire source topic.
+  `%1`, `%2%`, etc. will be replaced by the various components of the source
+  topics between the slashes.
+* The second argument is the QoS, it defaults to `1`. 
+* The third and last argument is whether the MQTT server should retain the data,
+  it defaults to `0` to switch off retain.
