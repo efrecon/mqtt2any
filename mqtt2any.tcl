@@ -33,6 +33,7 @@ set prg_args {
     -name       "%hostname%-%pid%-%prgname%"  "MQTT client name"
     -clean      on                 "MQTT clean connection?"
     -retry      "100:120000"       "Retry connection?"
+    -qos        1                  "QoS for subscriptions"
 }
 
 
@@ -243,7 +244,7 @@ proc ::Subscribe { mqtt } {
     # Connect to all subscriptions specified as part of the
     # command-line options.
     foreach { subscription route options } $MQ2A(-routes) {
-        $mqtt subscribe $subscription [list ::Receiver $subscription]
+        $mqtt subscribe $subscription [list ::Receiver $subscription] $MQ2A(-qos)
     }
 }
 

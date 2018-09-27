@@ -57,11 +57,11 @@ proc ::smqtt::new { broker args } {
 }
 
 
-proc ::smqtt::subscribe { o subscription cmd } {
+proc ::smqtt::subscribe { o subscription cmd { qos 1 } } {
     upvar \#0 $o context
 
     if { [dict get $context mqtt] ne "" } {
-        [dict get $context mqtt] subscribe $subscription $cmd
+        [dict get $context mqtt] subscribe $subscription $cmd $qos
     }
 }
 

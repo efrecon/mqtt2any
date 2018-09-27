@@ -53,6 +53,9 @@ The complete list of recognised options can be found below:
   and the last the factor by which to multiply the previous period at each
   unsuccessfull reconnection attempt (defaults to `2`).
 
+- `-qos` is the Quality of Service level when subscribing to topics, it defaults
+  to `1` (At least once).
+
 ## Routing
 
 Through its `-routes` command-line option, you will be able to bind procedures
@@ -116,6 +119,11 @@ follows:
   (pattern) and port. Allowance and denial rules are taken in order, so `-deny`
   can be used to selectively deny to some of the hosts that would otherwise have
   had been permitted using `-allow`.
+
+- `-path` and `-module` takes the local path to a directory where to find
+  old-style packages or modules.  The directory will then be added to the access
+  path in order to arrange for access to specific packages at specific locations
+  on the disk.
 
 - `-package` takes the name of a package, possibly followed by a colon and a
   version number as a value. It will arrange for the interpreter to load that
