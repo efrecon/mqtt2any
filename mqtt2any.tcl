@@ -5,7 +5,7 @@
 set resolvedArgv0 [file dirname [file normalize $argv0/___]];  # Trick to resolve last symlink
 set appname [file rootname [file tail $resolvedArgv0]]
 set rootdir [file normalize [file dirname $resolvedArgv0]]
-foreach module [list toclbox mqtt smqtt] {
+foreach module [list toclbox mqtt] {
     foreach search [list lib/$module ../common/$module] {
         set dir [file join $rootdir $search]
         if { [file isdirectory $dir] } {
