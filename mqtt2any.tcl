@@ -26,7 +26,11 @@ package require smqtt
 set prg_args {
     -help       ""                 "Print this help and exit"
     -verbose    "* INFO"           "Verbosity specification for program and modules"
-    -broker     "mqtt://localhost" "Remote MQTT broker to connect to"
+    -port       1883               "Port at MQTT broker to send to"
+    -host       localhost          "Hostname of remote MQTT broker"
+    -user       ""                 "Username to authenticate with at MQTT broker"
+    -password   ""                 "Password to authenticate with at MQTT broker"
+    -broker     ""                 "Remote MQTT broker to connect to, e.g. mqtt://localhost/ alt. to individual MQTT-related options"
     -exts       "%prgdir%/exts"    "Path to plugins directory"
     -routes     ""                 "Topic routing"
     -keepalive  60                 "Keep-alive frequency, in secs."
@@ -106,10 +110,11 @@ foreach {k v} [array get MQ2A -*] {
 }
 toclbox debug DEBUG [string trim $startup]
 
-# Possibly read nodes and routes information from files instead, since these
-# might get big
+# Possibly read nodes, routes etc. information from files instead, since these
+# might get big or want to be hidden from command-line
 toclbox offload MQ2A(-routes) 3 "routes"
 toclbox offload MQ2A(-broker) 1 "broker"
+toclbox offload MQ2A(-password) -1 "password"
 
 
 # ::debug -- Slave debug helper
@@ -253,6 +258,12 @@ proc ::Subscribe { mqtt } {
                     -name       $MQ2A(-name) \
                     -clean      $MQ2A(-clean) \
                     -retry      $MQ2A(-retry)
+
+# Construct broker URL out of separate MQTT arguments if necessary and open
+# persistent connection to broker.
+if { $MQ2A(-broker) eq "" } {
+    set MQ2A(-broker) "mqtt://$MQ2A(-user):$MQ2A(-password)@$MQ2A(-host):$MQ2A(-port)/"
+}
 set MQ2A(mqtt) [smqtt new $MQ2A(-broker) -connected ::Subscribe]
 if { $MQ2A(mqtt) eq "" } {
     exit 1
