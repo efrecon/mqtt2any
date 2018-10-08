@@ -2,9 +2,8 @@ FROM efrecon/medium-tcl
 MAINTAINER Emmanuel Frecon <efrecon@gmail.com>
 
 COPY *.tcl /opt/mqtt2any/
-COPY lib/mqtt/ /opt/mqtt2any/lib/mqtt/
-COPY lib/smqtt/ /opt/mqtt2any/lib/smqtt/
-COPY lib/toclbox/ /opt/mqtt2any/lib/toclbox/
+COPY lib/ /opt/mqtt2any/lib/
+COPY exts/*.tcl /opt/mqtt2any/exts/
 
 # Export the plugin directory so it gets easy to test new plugins.
 VOLUME /opt/mqtt2any/exts
