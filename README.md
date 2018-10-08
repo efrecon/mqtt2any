@@ -23,7 +23,19 @@ The complete list of recognised options can be found below:
   connection to `localhost`. A leading scheme of `mqtts://` will turn on TLS
   encryption when talking to the broker. The scheme can be entirely omitted, in
   which case a warning will be printed out and the default of `mqtt://` used.
-  
+  When `-broker` is empty, the default, MQTT-specific command-line options are
+  used instead.
+
+- `-host` name of host at which MQTT broker is located, used whenever `-broker`
+  is empty.
+
+- `-port` port numer at which MQTT broker is located, used whenever `-broker`
+  is empty.
+
+- `-user` username at MQTT broker, used whenever `-broker` is empty.
+
+- `-password` password at MQTT broker, used whenever `-broker` is empty.
+
 - `-exts` is a whitespace separated list of directory specifications where to
   look for plugins.
   
@@ -55,6 +67,19 @@ The complete list of recognised options can be found below:
 
 - `-qos` is the Quality of Service level when subscribing to topics, it defaults
   to `1` (At least once).
+
+### Offloading Values
+
+For the command-line options `-broker`, `-password` and `-routes`, it is
+possible to offload the value from a file or the result of a command. Whenever
+the value starts with a `@` sign, the remaining characters should form a path to
+a file where the content of the option will be taken from. Whenever the value
+starts with a `!` sign, the remaining characters should form a command to
+execute to get the content of the option. This is **dangerous** as it enables
+running random commands on the machine. Both facilities makes it easier to load
+the value of these options as they might be long to enter directly at the
+command-line or need improved secrecy, such as, for example, when used in
+association with Docker [secrets](https://docs.docker.com/engine/swarm/secrets/).
 
 ## Routing
 
