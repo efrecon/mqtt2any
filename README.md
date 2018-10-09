@@ -75,11 +75,17 @@ possible to offload the value from a file or the result of a command. Whenever
 the value starts with a `@` sign, the remaining characters should form a path to
 a file where the content of the option will be taken from. Whenever the value
 starts with a `!` sign, the remaining characters should form a command to
-execute to get the content of the option. This is **dangerous** as it enables
-running random commands on the machine. Both facilities makes it easier to load
-the value of these options as they might be long to enter directly at the
+execute to get the content of the option. Both facilities makes it easier to
+load the value of these options as they might be long to enter directly at the
 command-line or need improved secrecy, such as, for example, when used in
-association with Docker [secrets](https://docs.docker.com/engine/swarm/secrets/).
+association with Docker [secrets]. For security reasons, only a restricted set
+of commands is allowed in the pipelines following the `!` sign. At the time of
+writing, these are targetting easy textual extractions from files: `echo`,
+`printf`, `grep`, `sed`, `awk`, `jq`, `cut`, `head`, `tail` and `sort`. There is
+no way to configure this list as it would provide a workaround to this security
+measure.
+
+  [secrets]: https://docs.docker.com/engine/swarm/secrets
 
 ## Routing
 

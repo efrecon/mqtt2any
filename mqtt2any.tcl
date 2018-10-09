@@ -112,6 +112,16 @@ toclbox debug DEBUG [string trim $startup]
 
 # Possibly read nodes, routes etc. information from files instead, since these
 # might get big or want to be hidden from command-line
+toclbox apparmor -allow */bin/echo \
+                 -allow */bin/printf \
+                 -allow */bin/grep \
+                 -allow */bin/sed \
+                 -allow */bin/awk \
+                 -allow */bin/jq \
+                 -allow */bin/cut \
+                 -allow */bin/head \
+                 -allow */bin/tail \
+                 -allow */bin/sort
 toclbox offload MQ2A(-routes) 3 "routes"
 toclbox offload MQ2A(-broker) 1 "broker"
 toclbox offload MQ2A(-password) -1 "password"
