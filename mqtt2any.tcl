@@ -121,6 +121,7 @@ toclbox apparmor -allow */bin/echo \
                  -allow */bin/cut \
                  -allow */bin/head \
                  -allow */bin/tail \
+                 -allow */bin/tr \
                  -allow */bin/sort
 toclbox offload MQ2A(-routes) 3 "routes"
 toclbox offload MQ2A(-broker) 1 "broker"
