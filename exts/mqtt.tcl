@@ -4,6 +4,8 @@ array set options {
     -user       ""
     -password   ""
     -broker     "mqtt://localhost"
+
+    obfuscate      {"-password"}
 }
 
 # Connection to MQTT
@@ -15,10 +17,18 @@ set ::mqtt ""
 foreach k [array names options -*] {
     set envvar [string toupper [file rootname [file tail [info script]]]]_[string toupper [string trimleft $k -]]
     if { [info exists ::env($envvar)] } {
-        debug "Setting option $k to [set ::env($envvar)] (via environment)" NOTICE
+        if { $k in $options(obfuscate) } {
+            debug "Setting option $k to [string repeat "*" [string length [set ::env($envvar)]]] (via environment)" NOTICE
+        } else {
+            debug "Setting option $k to [set ::env($envvar)] (via environment)" NOTICE
+        }
         set options($k) [set ::env($envvar)]
     }
-    debug "Option $k is $options($k)" INFO
+    if { $k in $options(obfuscate) } {
+        debug "Option $k is [string repeat "*" [string length $options($k)]]" INFO
+    } else {
+        debug "Option $k is $options($k)" INFO
+    }
 }
 
 
