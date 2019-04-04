@@ -1,4 +1,8 @@
 array set options {
+    -host       "localhost"
+    -port       1883
+    -user       ""
+    -password   ""
     -broker     "mqtt://localhost"
 }
 
@@ -21,6 +25,12 @@ foreach k [array names options -*] {
 
 proc forward { topic body { dst "" } {qos 1} {retain 0}} {
     if { $::mqtt eq "" } {
+        # Construct broker URL out of separate MQTT arguments if necessary and open
+        # persistent connection to broker.
+        if { $::options(-broker) eq "" } {
+            set ::options(-broker) "mqtt://$::options(-user):$::options(-password)@$::options(-host):$::options(-port)/"
+            debug "Constructed broker URL: mqtt://$::options(-user):*****@$::options(-host):$::options(-port)/" NOTICE
+        }       
         set ::mqtt [smqtt new $::options(-broker)]
     }
 
