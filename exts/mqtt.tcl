@@ -166,6 +166,18 @@ proc forward { topic body { dst "" } {qos 1} {retain 0}} {
                 set LIMIT(messages) 0
                 set LIMIT(bytes) 0
                 set LIMIT(timer) [after $LIMIT(-period) [list ::reset $pattern]]
+                set txt "Created rate limiter for destination topics matching $LIMIT(-pattern)"
+                if { $LIMIT(-messages) > 0 } {
+                    append txt " max. $LIMIT(-messages) messages / $LIMIT(-period) ms."
+                } elseif { $LIMIT(-messages) == 0 } {
+                    append txt " all messages discarded."
+                }
+                if { $LIMIT(-bytes) > 0 } {
+                    append txt " max. $LIMIT(-bytes) bytes / $LIMIT(-period) ms."
+                } elseif { $LIMIT(-bytes) == 0 } {
+                    append txt " all messages discarded."
+                }
+                debug $txt NOTICE
             }
 
             # Check against known limits and decide to forward or not.
