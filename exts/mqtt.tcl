@@ -33,6 +33,27 @@ foreach k [array names options -*] {
     }
 }
 
+
+# Read limits from file whenever appropriate
+if { [string index $::options(-limits) 0] eq "@" } {
+    debug "Reading rate limiting from [string range $::options(-limits) 1 end]" NOTICE
+    set fd [open [string range $::options(-limits) 1 end]]
+    set ::options(-limits) [list]
+    while {![eof $fd]} {
+        set line [string trim [gets $fd]]
+        if { $line ne "" && [string index $line 0] ne "\#" } {
+            if { $line eq "-" } {
+                lappend ::options(-limits) ""
+            } else {
+                lappend ::options(-limits) $line
+            }
+        }
+    }
+    close $fd
+    debug "Read [expr {[llength $::options(-limits)]/4}] rate-limiting specifications" INFO
+}
+
+
 ##### Following code from https://wiki.tcl-lang.org/page/Converting+human+time+durations
 proc HowLong {len unit} {
     if { [string is integer -strict $len] } {
