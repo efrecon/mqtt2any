@@ -59,11 +59,11 @@ The complete list of recognised options can be found below:
   attempted. Otherwise the value of this option should be an integer number of
   milliseconds expressing the period at which reconnection attempts will be
   made. The value of this option can also be up to three integers separated by
-  the colon `:` sign, to implement an exponential backoff for reconnection. The
+  the colon `:` sign, to implement an exponential back-off for reconnection. The
   first integer is the minimal number of milliseconds to wait before
   reconnecting. The second integer the maximum number of milliseconds to wait
   and the last the factor by which to multiply the previous period at each
-  unsuccessfull reconnection attempt (defaults to `2`).
+  unsuccessful reconnection attempt (defaults to `2`).
 
 - `-qos` is the Quality of Service level when subscribing to topics, it defaults
   to `1` (At least once).
@@ -94,7 +94,7 @@ to a specific subscription. The topic at which data was received and the data
 itself are always passed as arguments to the procedures and these will be able
 to operate as they which on the data acquired from the broker. You will also be
 able to pass arguments to those procedures in order to refine what they should
-perform for example. Data treatment occuring in plugins will be executed within
+perform for example. Data treatment occurring in plugins will be executed within
 safe Tcl interpreters, which guarantees maximum flexibility when it comes to
 transformation capabilities while guaranteeing security through encapsulation of
 all IO and system commands.
@@ -112,9 +112,9 @@ be called with the following arguments.
 2. The content of the data.
 
 The procedure `print` is then free to perform any kind of operations it deems
-necessary on the data. An example `print` procedure is availabe under the `exts`
-subdirectory in the `printer.tcl` file. The procedure will print the content of
-each data block.
+necessary on the data. An example `print` procedure is available under the
+`exts` subdirectory in the `printer.tcl` file. The procedure will print the
+content of each data block.
 
 ### Additional Arguments
 
@@ -123,7 +123,7 @@ the name of the procedure.  These arguments will be blindly passed after the
 requested URL and the data to the procedure when it is executed. So, for
 example, if your route contained a plugin specification similar to
 `myproc!onearg!3@myplugin.tcl`, procedure `myproc` in `myplugin.tcl` would be
-called with 4 arguments everytime data is available, i.e. the topic, the data
+called with 4 arguments every time data is available, i.e. the topic, the data
 itself and `onearg` and `3` as arguments.  Spaces are allowed in arguments, as
 long as you specify quotes (or curly-braces) around the procedure call
 construct.
@@ -187,7 +187,11 @@ Running the following command leverages the `$SYS` tree made available at the
 [mosquitto](http://test.mosquitto.org/) project. This uses the example data
 dumping procedure described above.
 
-    ./mqtt2any.tcl -broker mqtt://test.mosquitto.org -verbose "printer.tcl DEBUG * INFO" -routes "\$SYS/# print@printer.tcl \"\""
+```shell
+./mqtt2any.tcl  -broker mqtt://test.mosquitto.org \
+                -verbose "printer.tcl DEBUG * INFO" \
+                -routes "\$SYS/# print@printer.tcl \"\""
+```
 
 ## Docker
 
@@ -206,7 +210,11 @@ data posted at topics of the main MQTT server used by `mqtt2any` to other MQTT
 brokers. Forwarding is perhaps best explained starting with an example that is
 broken up in logical pieces and explained below.
 
-    ./mqtt2any.tcl -verbose "*.tcl debug * info" -broker mqtt://test.mosquitto.org -routes "bbc/# forward@mqtt.tcl \"-alias {smqtt smqtt} -environment MQTT_BROKER=mqtt://broker.hivemq.com\""
+```shell
+./mqtt2any.tcl  -verbose "*.tcl debug * info" \
+                -broker mqtt://test.mosquitto.org \
+                -routes "bbc/# forward@mqtt.tcl \"-alias {smqtt smqtt} -environment MQTT_BROKER=mqtt://broker.hivemq.com\""
+```
 
 The example leverages the BBC subtitles sent to the mosquitto test
 [broker](https://test.mosquitto.org) and forwards their content as-is to the
@@ -214,12 +222,12 @@ same topics at the HiveMQ public [broker](https://www.hivemq.com/try-out/)
 available at the address `broker.hivemq.com`. The options to the example command
 are as follows:
 
-* `-verbose` sets the verbosity for all Tcl implementations to `DEBUG` while
+- `-verbose` sets the verbosity for all Tcl implementations to `DEBUG` while
   keeping the remaining levels to `INFO`. This is to ensure being able to print
   out debug information from the implementation at `mqtt.tcl` in the `exts/`
   directory.
-* `-broker` simply points at the test mosquitto broker.
-* `-routes` is a single triplet to be understood as follows:
+- `-broker` simply points at the test mosquitto broker.
+- `-routes` is a single triplet to be understood as follows:
   1. The first item `bbc/#` is a MQTT subscription that matches all the BBC
      subtitles at the mosquitto test server.
   2. The second item `forward@mqtt.tcl` requests `mqtt2any` to send data
@@ -229,7 +237,7 @@ are as follows:
      is a set of dash-led options and arguments as explained above. These
      options are the following:
      - `-alias` installs an alias in the slave interpreter for the `smqtt`,
-       alias takes a source and destionation commands. This will allow the
+       alias takes a source and destination commands. This will allow the
        interpreter to use the same MQTT implementation as the one used for
        `mqtt2any` and to execute this code back *in the main* interpreter.
      - `-environment` declares and sets the variable `MQTT_BROKER` in order to
@@ -245,19 +253,69 @@ There you should be able to connect to the HiveMQ demo broker and subscribe to
 `bbc/#`. You should see the content of the BBC subtitles that are being
 forwarding by your process to the HiveMQ broker.
 
-### Arguments
+### Options
+
+The forwarding module takes a number of options, declared at the top. These
+options are led by a dash (`-`) sign and can be set from the outside using
+environment variables. The variables are constructed from the name of the option
+and the module. So, for an option called `-broker`, setting the environment
+variable called `MQTT_BROKER` will automatically set the option. Environment
+variables are all caps and led by `MQTT` which is the uppercased conversion of
+the name of the main file.
+
+The options supported by the forwarding module are as follows.
+
+- `-broker` is a fully qualified URL to the broker, including the leading scheme
+  and possible user and password specification. Whenever this is empty, the
+  broker will be constructed out of the following options.
+- `-proto` is the protocol, i.e. `mqtt` or `mqtts`.
+- `-host` is the hostname (or IP) where the MQTT server runs.
+- `-port` is the port and defaults to `1883`.
+- `-user` is the name of the user when connecting the the MQTT server and
+  defaults to an empty string.
+- `-password` is the password for the user, defaults to an empty string.
+- `-limits` can be used to perform some crude rate limiting on forwarded data.
+  It is a quad-length list where the items are the following:
+  1. The first item is an MQTT pattern that will match the resolved destination
+     topic, e.g. `bbc/#` and expressing the rate limiting for all destination
+     topics matching that pattern.
+  2. The second item is either an integer number of milliseconds or a
+     human-friendly duration in seconds (e.g. 5s or "4 mins 5s"). This expresses
+     the time length of the rate limiting bucket.
+  3. The maximum number of messages within the period of the rate-limiting
+     bucket. A value strictly less than zero turns off rate limiting on number
+     of messages. A value equal to zero discard all messages matching the topic.
+  4. The maximum bytes of body within the period of the rate-limiting bucket. A
+     value strictly less than zero turns off rate limiting on message length of
+     messages. A value equal to zero discard all messages matching the topic.
+
+Rate limiting is decided by the first matching pattern. The following example
+performs a looser rate limiting for the more specific topics matching
+`bbc/subtitles/bbc_news24/#` rather than the ones matching `bbc/#`. Topics
+matching `bbc/subtitles/bbc_news24/#` cannot send more than 200 bytes per 10000
+milliseconds. Topics matching `bbc/#` (and not matching the previous pattern)
+cannot send more than 5 messages per 5 seconds (expressed as `5s` in the
+example).
+
+```shell
+./mqtt2any.tcl  -verbose "*.tcl debug * info" \
+                -broker mqtt://test.mosquitto.org \
+                -routes "bbc/# forward@mqtt.tcl \"-alias {smqtt smqtt} -environment MQTT_BROKER=mqtt://broker.hivemq.com -environment {MQTT_LIMITS=bbc/subtitles/bbc_news24/# 10000 -1 200 bbc/# 5s 5 -1}\""
+```
+
+### Procedure Arguments
 
 The `forward` procedure can currently take 3 arguments, these can be specified
 by inserting them surrounded by `!` marks in the route specification.
 
-* The first argument is the topic to which to publish data that was received by
+- The first argument is the topic to which to publish data that was received by
   the main MQTT broker. By default, when no argument is specified (and as in the
   example above) the same topic as the source will be used for the destination.
   However, the implementation is able to use a number of `%` surrounded
   sugar-strings that will be automatically be replaced by their values taken
   from the source topic. `%topic%` will be replaced by the entire source topic.
-  `%1`, `%2%`, etc. will be replaced by the various components of the source
+  `%1%`, `%2%`, etc. will be replaced by the various components of the source
   topics between the slashes.
-* The second argument is the QoS, it defaults to `1`. 
-* The third and last argument is whether the MQTT server should retain the data,
+- The second argument is the QoS, it defaults to `1`.
+- The third and last argument is whether the MQTT server should retain the data,
   it defaults to `0` to switch off retain.

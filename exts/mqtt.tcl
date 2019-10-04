@@ -3,7 +3,9 @@ array set options {
     -port       1883
     -user       ""
     -password   ""
+    -proto      "mqtt"
     -broker     "mqtt://localhost"
+    -limits     {}
 
     obfuscate      {"-password"}
 }
@@ -31,14 +33,94 @@ foreach k [array names options -*] {
     }
 }
 
+##### Following code from https://wiki.tcl-lang.org/page/Converting+human+time+durations
+proc HowLong {len unit} {
+    if { [string is integer -strict $len] } {
+        switch -glob -- $unit {
+            "\[Yy\]*" {
+                return [expr {$len*31536000}];   # Leap years?
+            }
+            "\[Mm\]\[Oo\]*" -
+            "m*" {
+                return [expr {$len*2592000}]
+            }
+            "\[Ww\]*" {
+                return [expr {$len*604800}]
+            }
+            "\[Dd\]*" {
+                return [expr {$len*86400}]
+            }
+            "\[Hh\]*" {
+                return [expr {$len*3600}]
+            }
+            "\[Mm\]\[Ii\]*" -
+            "M" {
+                return [expr {$len*60}]
+            }
+            "\[Ss\]*" {
+                return $len
+            }
+        }
+    }
+    return 0
+}
 
+
+proc Duration { str } {
+    set words {}
+    while {[scan $str %s%n word length] == 2} {
+        lappend words $word
+        set str [string range $str $length end]
+    }
+
+    set seconds 0
+    for {set i 0} {$i<[llength $words]} {incr i} {
+        set f [lindex $words $i]
+        if { [scan $f %d%n n length] == 2 } {
+            set unit [string range $f $length end]
+            if { $unit eq "" } {
+                incr seconds [HowLong $n [lindex $words [incr i]]]
+            } else {
+                incr seconds [HowLong $n $unit]
+            }
+        }
+    }
+
+    return $seconds
+}
+##### End of code from https://wiki.tcl-lang.org/page/Converting+human+time+durations
+
+# Does a topic match an MQTT pattern (copied from mqtt library)
+proc match {pattern topic} {
+	if {[string index $topic 0] eq "$"} {
+	    if {[string index $pattern 0] ne "$"} {
+            return 0
+        }
+	}
+	foreach p [split $pattern /] n [split $topic /] {
+	    if {$p eq "#"} {
+		    return 1
+	    } elseif {$p ne $n && $p ne "+"} {
+		    return 0
+	    }
+	}
+	return 1
+}
+
+proc reset { pattern } {
+    set varname ::limiter_[regsub -all -nocase {[^\w/#+]} $pattern _]
+    upvar \#0 $varname LIMIT
+    set LIMIT(messages) 0
+    set LIMIT(bytes) 0
+    set LIMIT(timer) [after $LIMIT(-period) [list ::reset $pattern]]
+}
 
 proc forward { topic body { dst "" } {qos 1} {retain 0}} {
     if { $::mqtt eq "" } {
         # Construct broker URL out of separate MQTT arguments if necessary and open
         # persistent connection to broker.
         if { $::options(-broker) eq "" } {
-            set ::options(-broker) "mqtt://$::options(-user):$::options(-password)@$::options(-host):$::options(-port)/"
+            set ::options(-broker) "$::options(-proto)://$::options(-user):$::options(-password)@$::options(-host):$::options(-port)/"
             debug "Constructed broker URL: mqtt://$::options(-user):*****@$::options(-host):$::options(-port)/" NOTICE
         }       
         set ::mqtt [smqtt new $::options(-broker)]
@@ -64,6 +146,46 @@ proc forward { topic body { dst "" } {qos 1} {retain 0}} {
         set dst [string map $mapper $dst]
     }
 
-    debug "Forwarding data to $dst" DEBUG
-    smqtt send $::mqtt $dst $body $qos $retain
+    set forward 1
+    foreach {pattern period messages bytes} $::options(-limits) {
+        if { [match $pattern $dst] } {
+            set varname ::limiter_[regsub -all -nocase {[^\w/#+]} $pattern _]
+            if { ! [info exists $varname] } {
+                # Create a limiter "object"
+                upvar \#0 $varname LIMIT
+                set LIMIT(-pattern) $pattern
+                if { [string is integer -strict $period] } {
+                    set LIMIT(-period) $period
+                } else {
+                    set secs [Duration $period]
+                    set LIMIT(-period) [expr {$secs*1000}]
+                    debug "Converted period $period to $LIMIT(-period) ms" INFO
+                }
+                set LIMIT(-messages) $messages
+                set LIMIT(-bytes) $bytes
+                set LIMIT(messages) 0
+                set LIMIT(bytes) 0
+                set LIMIT(timer) [after $LIMIT(-period) [list ::reset $pattern]]
+            }
+
+            # Check against known limits and decide to forward or not.
+            upvar \#0 $varname LIMIT
+            set len [string length $body]
+            if { ( $LIMIT(-messages) < 0 || $LIMIT(messages) + 1 < $LIMIT(-messages) ) \
+                && ( $LIMIT(-bytes) < 0 || $LIMIT(bytes) + $len < $LIMIT(-bytes) )} {
+                set forward 1
+                incr LIMIT(messages)
+                incr LIMIT(bytes) $len
+            } else {
+                set forward 0
+                debug "Rejecting data to $dst, would override rate limit for $pattern" NOTICE
+            }
+            break;   # Stop decisions on first match
+        }
+    }
+
+    if { $forward } {
+        debug "Forwarding data to $dst" DEBUG
+        smqtt send $::mqtt $dst $body $qos $retain
+    }
 }
