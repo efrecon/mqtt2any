@@ -303,6 +303,17 @@ example).
                 -routes "bbc/# forward@mqtt.tcl \"-alias {smqtt smqtt} -environment MQTT_BROKER=mqtt://broker.hivemq.com -environment {MQTT_LIMITS=bbc/subtitles/bbc_news24/# 10000 -1 200 bbc/# 5s 5 -1}\""
 ```
 
+Complex routing, and rate limiting can be expressed through reading files
+instead. Running the following example from the main directory of this project
+would lead to exactly the same routing and rate-limiting as the example above. A
+leading `@` sign is used as a marker.
+
+```shell
+./mqtt2any.tcl -verbose "*.tcl debug * info" \
+               -broker mqtt://test.mosquitto.org \
+               -routes @./examples/routes.cfg
+```
+
 ### Procedure Arguments
 
 The `forward` procedure can currently take 3 arguments, these can be specified
