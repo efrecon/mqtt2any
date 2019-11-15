@@ -128,12 +128,12 @@ proc match {pattern topic} {
 	return 1
 }
 
-proc reset { pattern } {
-    set varname ::limiter_[regsub -all -nocase {[^\w/#+]} $pattern _]
+proc reset { id } {
+    set varname ::limiter_[regsub -all -nocase {[^\w/#+]} $id _]
     upvar \#0 $varname LIMIT
     set LIMIT(messages) 0
     set LIMIT(bytes) 0
-    set LIMIT(timer) [after $LIMIT(-period) [list ::reset $pattern]]
+    set LIMIT(timer) [after $LIMIT(-period) [list ::reset $id]]
 }
 
 proc forward { topic body { dst "" } {qos 1} {retain 0}} {
@@ -167,14 +167,16 @@ proc forward { topic body { dst "" } {qos 1} {retain 0}} {
         set dst [string map $mapper $dst]
     }
 
-    set forward 1
-    foreach {pattern period messages bytes} $::options(-limits) {
+    # Create rate-limiting context on demand
+    foreach {pattern individual period messages bytes} $::options(-limits) {
         if { [match $pattern $dst] } {
-            set varname ::limiter_[regsub -all -nocase {[^\w/#+]} $pattern _]
+            set id [ expr { $individual ? $dst : $pattern } ]
+            set varname ::limiter_[regsub -all -nocase {[^\w/#+]} $id _]
             if { ! [info exists $varname] } {
                 # Create a limiter "object"
                 upvar \#0 $varname LIMIT
                 set LIMIT(-pattern) $pattern
+                set LIMIT(-id) $id
                 if { [string is integer -strict $period] } {
                     set LIMIT(-period) $period
                 } else {
@@ -186,8 +188,8 @@ proc forward { topic body { dst "" } {qos 1} {retain 0}} {
                 set LIMIT(-bytes) $bytes
                 set LIMIT(messages) 0
                 set LIMIT(bytes) 0
-                set LIMIT(timer) [after $LIMIT(-period) [list ::reset $pattern]]
-                set txt "Created rate limiter for destination topics matching $LIMIT(-pattern)"
+                set LIMIT(timer) [after $LIMIT(-period) [list ::reset $id]]
+                set txt "Created rate limiter for destination topics $LIMIT(-id) from matching $LIMIT(-pattern)"
                 if { $LIMIT(-messages) > 0 } {
                     append txt " max. $LIMIT(-messages) messages / $LIMIT(-period) ms."
                 } elseif { $LIMIT(-messages) == 0 } {
@@ -200,9 +202,16 @@ proc forward { topic body { dst "" } {qos 1} {retain 0}} {
                 }
                 debug $txt NOTICE
             }
+            break;    # Stop decisions on first match
+        }
+    }
 
-            # Check against known limits and decide to forward or not.
-            upvar \#0 $varname LIMIT
+    # Decide to forward or not
+    set forward 1
+    foreach varname [info vars ::limiter_*] {
+        # Check against known limits and decide to forward or not.
+        upvar \#0 $varname LIMIT
+        if { [match $LIMIT(-id) $dst] } {
             set len [string length $body]
             if { ( $LIMIT(-messages) < 0 || $LIMIT(messages) + 1 < $LIMIT(-messages) ) \
                 && ( $LIMIT(-bytes) < 0 || $LIMIT(bytes) + $len < $LIMIT(-bytes) )} {
@@ -211,7 +220,7 @@ proc forward { topic body { dst "" } {qos 1} {retain 0}} {
                 incr LIMIT(bytes) $len
             } else {
                 set forward 0
-                debug "Rejecting data to $dst, would override rate limit for $pattern" NOTICE
+                debug "Rejecting data to $dst, would override rate limit for $LIMIT(-id)" NOTICE
             }
             break;   # Stop decisions on first match
         }

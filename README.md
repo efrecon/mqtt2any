@@ -36,11 +36,11 @@ The complete list of recognised options can be found below:
 
 - `-password` password at MQTT broker, used whenever `-broker` is empty.
 
-- `-exts` is a whitespace separated list of directory specifications where to
-  look for plugins.
+- `-exts` is a whites-pace separated list of directory specifications where to
+  look for plug-ins.
   
 - `-routes` is a list of triplets describing the routes for data transformation
-  depending on incoming paths. The first item is a topic subsription, the second
+  depending on incoming paths. The first item is a topic subscription, the second
   item a specification for how to transform data (see below) and the third item
   is a list of dash-led options and their values (see below).
   
@@ -94,12 +94,12 @@ to a specific subscription. The topic at which data was received and the data
 itself are always passed as arguments to the procedures and these will be able
 to operate as they which on the data acquired from the broker. You will also be
 able to pass arguments to those procedures in order to refine what they should
-perform for example. Data treatment occurring in plugins will be executed within
-safe Tcl interpreters, which guarantees maximum flexibility when it comes to
-transformation capabilities while guaranteeing security through encapsulation of
-all IO and system commands.
+perform for example. Data treatment occurring in plug-ins will be executed
+within safe Tcl interpreters, which guarantees maximum flexibility when it comes
+to transformation capabilities while guaranteeing security through encapsulation
+of all I/O and system commands.
 
-All `tcl` files implementing the plugins should be placed in the directories
+All `tcl` files implementing the plug-ins should be placed in the directories
 that is pointed at by the `-exts` option. Binding between subscriptions and
 procedures occurs through the `-routes` option. For example, starting the
 program with `-routes "# print@printer.tcl \"\""` will arrange for all data
@@ -121,7 +121,7 @@ content of each data block.
 To pass arguments to the procedure, you can separate them with `!`-signs after
 the name of the procedure.  These arguments will be blindly passed after the
 requested URL and the data to the procedure when it is executed. So, for
-example, if your route contained a plugin specification similar to
+example, if your route contained a plug-in specification similar to
 `myproc!onearg!3@myplugin.tcl`, procedure `myproc` in `myplugin.tcl` would be
 called with 4 arguments every time data is available, i.e. the topic, the data
 itself and `onearg` and `3` as arguments.  Spaces are allowed in arguments, as
@@ -232,7 +232,7 @@ are as follows:
      subtitles at the mosquitto test server.
   2. The second item `forward@mqtt.tcl` requests `mqtt2any` to send data
      received on those topics to the procedure called `forward` in the file
-     `mqtt.tcl` (located in the default plugins directory at `exts/`).
+     `mqtt.tcl` (located in the default plug-ins directory at `exts/`).
   3. The last item, enclosed in quotes escaped with backslashes for the shell,
      is a set of dash-led options and arguments as explained above. These
      options are the following:
@@ -243,7 +243,7 @@ are as follows:
      - `-environment` declares and sets the variable `MQTT_BROKER` in order to
        pass information about the remote broker where to forward content. This
        variable is to be understood as `MQTT` matching (in uppercase) the name
-       of the plugin implementation file, and `BROKER` matching (in uppercase)
+       of the plug-in implementation file, and `BROKER` matching (in uppercase)
        the `-broker` option declared at the top of the `mqtt.tcl` forwarding
        implementation.
 
@@ -279,13 +279,17 @@ The options supported by the forwarding module are as follows.
   1. The first item is an MQTT pattern that will match the resolved destination
      topic, e.g. `bbc/#` and expressing the rate limiting for all destination
      topics matching that pattern.
-  2. The second item is either an integer number of milliseconds or a
+  2. The second item is a boolean. When on and when the pattern contains MQTT
+     wildcards, individual topics will have their own rate-limiting buckets.
+     When off, all topics under that wildcard will share the rate-limiting
+     bucket.
+  3. The third item is either an integer number of milliseconds or a
      human-friendly duration in seconds (e.g. 5s or "4 mins 5s"). This expresses
      the time length of the rate limiting bucket.
-  3. The maximum number of messages within the period of the rate-limiting
+  4. The maximum number of messages within the period of the rate-limiting
      bucket. A value strictly less than zero turns off rate limiting on number
      of messages. A value equal to zero discard all messages matching the topic.
-  4. The maximum bytes of body within the period of the rate-limiting bucket. A
+  5. The maximum bytes of body within the period of the rate-limiting bucket. A
      value strictly less than zero turns off rate limiting on message length of
      messages. A value equal to zero discard all messages matching the topic.
 
@@ -295,12 +299,12 @@ performs a looser rate limiting for the more specific topics matching
 matching `bbc/subtitles/bbc_news24/#` cannot send more than 200 bytes per 10000
 milliseconds. Topics matching `bbc/#` (and not matching the previous pattern)
 cannot send more than 5 messages per 5 seconds (expressed as `5s` in the
-example).
+example) per topic (as of the expansion boolean set to `on`).
 
 ```shell
 ./mqtt2any.tcl  -verbose "*.tcl debug * info" \
                 -broker mqtt://test.mosquitto.org \
-                -routes "bbc/# forward@mqtt.tcl \"-alias {smqtt smqtt} -environment MQTT_BROKER=mqtt://broker.hivemq.com -environment {MQTT_LIMITS=bbc/subtitles/bbc_news24/# 10000 -1 200 bbc/# 5s 5 -1}\""
+                -routes "bbc/# forward@mqtt.tcl \"-alias {smqtt smqtt} -environment MQTT_BROKER=mqtt://broker.hivemq.com -environment {MQTT_LIMITS=bbc/subtitles/bbc_news24/# off 10000 -1 200 bbc/# on 5s 5 -1}\""
 ```
 
 Complex routing, and rate limiting can be expressed through reading files
